@@ -2,14 +2,15 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
-	"net/url"
-	"strconv"
 	"time"
 
 	//"go.mongodb.org/mongo-driver/bson"
+	"github.com/asaskevich/govalidator"
+	"github.com/dchest/uniuri"
 	"github.com/gorilla/mux"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -28,20 +29,39 @@ func initDBClient() *mongo.Collection {
 }
 
 func beepController(res http.ResponseWriter, req *http.Request) {
-	res.Write([]byte("boop\n"))
+	fmt.Fprint(res, "boop")
 }
 
+type url struct {
+	URL  string `json:"url"`
+	UUID string `json:"uuid"`
+}
+
+//TODO: Split this up, clean up error handling
 func postURLController(res http.ResponseWriter, req *http.Request) {
-	ok := isValidURL("walmart.com")
-	res.Write([]byte(strconv.FormatBool(ok) + "\n"))
-}
-
-func isValidURL(str string) bool {
-	fmt.Println(str)
-	u, err := url.ParseRequestURI(str)
-	fmt.Println(err)
-	fmt.Println(u.Host)
-	return err == nil && u.Host != ""
+	var data url
+	err := json.NewDecoder(req.Body).Decode(&data)
+	if err != nil {
+		res.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	if govalidator.IsURL(data.URL) == false {
+		res.WriteHeader(http.StatusBadRequest)
+		fmt.Fprint(res, "Invalid URL")
+		return
+	}
+	uuid := uniuri.NewLen(5)
+	data.UUID = uuid
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	_, err2 := urls.InsertOne(ctx, data)
+	if err2 != nil {
+		res.WriteHeader(http.StatusBadRequest)
+		fmt.Fprint(res, "DB Error")
+		return
+	}
+	res.WriteHeader(http.StatusAccepted)
+	json.NewEncoder(res).Encode(map[string]string{"uuid": uuid})
 }
 
 func main() {
