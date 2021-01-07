@@ -8,10 +8,10 @@ import (
 	"net/http"
 	"time"
 
-	//"go.mongodb.org/mongo-driver/bson"
 	"github.com/asaskevich/govalidator"
 	"github.com/dchest/uniuri"
 	"github.com/gorilla/mux"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
@@ -33,8 +33,8 @@ func beepController(res http.ResponseWriter, req *http.Request) {
 }
 
 type url struct {
-	URL  string `json:"url"`
-	UUID string `json:"uuid"`
+	URL string `json:"url"`
+	ID  string `json:"id"`
 }
 
 //TODO: Split this up, clean up error handling
@@ -51,7 +51,7 @@ func postURLController(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 	uuid := uniuri.NewLen(5)
-	data.UUID = uuid
+	data.ID = uuid
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	_, err2 := urls.InsertOne(ctx, data)
@@ -61,7 +61,21 @@ func postURLController(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 	res.WriteHeader(http.StatusAccepted)
-	json.NewEncoder(res).Encode(map[string]string{"uuid": uuid})
+	json.NewEncoder(res).Encode(map[string]string{"id": uuid})
+}
+
+func redirectController(res http.ResponseWriter, req *http.Request) {
+	vars := mux.Vars(req)
+	id := vars["id"]
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	var redirectTarget url
+	err := urls.FindOne(ctx, bson.M{"id": id}).Decode(&redirectTarget)
+	if err != nil {
+		res.WriteHeader(http.StatusNotFound)
+		return
+	}
+	http.Redirect(res, req, redirectTarget.URL, http.StatusFound)
 }
 
 func main() {
@@ -70,5 +84,6 @@ func main() {
 	router := mux.NewRouter()
 	router.HandleFunc("/beep", beepController).Methods("GET")
 	router.HandleFunc("/url", postURLController).Methods("POST")
+	router.HandleFunc("/{id}", redirectController).Methods("GET")
 	log.Fatal(http.ListenAndServe("localhost:8000", router))
 }
