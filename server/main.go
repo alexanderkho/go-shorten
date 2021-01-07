@@ -78,12 +78,25 @@ func redirectController(res http.ResponseWriter, req *http.Request) {
 	http.Redirect(res, req, redirectTarget.URL, http.StatusFound)
 }
 
+type spaHandler struct {
+	staticPath string
+	indexPath  string
+}
+
+func (h spaHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	http.FileServer(http.Dir(h.staticPath)).ServeHTTP(w, r)
+}
+
 func main() {
 	fmt.Println("Server started!")
 	urls = initDBClient()
 	router := mux.NewRouter()
-	router.HandleFunc("/beep", beepController).Methods("GET")
-	router.HandleFunc("/url", postURLController).Methods("POST")
+
+	router.HandleFunc("/api/beep", beepController).Methods("GET")
+	router.HandleFunc("/api/url", postURLController).Methods("POST")
 	router.HandleFunc("/{id}", redirectController).Methods("GET")
+	spa := spaHandler{staticPath: "../client", indexPath: "index.html"}
+	router.PathPrefix("/").Handler(spa)
+
 	log.Fatal(http.ListenAndServe("localhost:8000", router))
 }
