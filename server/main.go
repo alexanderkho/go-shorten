@@ -95,7 +95,7 @@ func main() {
 	router.HandleFunc("/api/beep", beepController).Methods("GET")
 	router.HandleFunc("/api/url", postURLController).Methods("POST")
 	router.HandleFunc("/{id}", redirectController).Methods("GET")
-	spa := spaHandler{staticPath: "../client", indexPath: "index.html"}
+	spa := spaHandler{staticPath: "../client/dist", indexPath: "index.html"}
 	router.PathPrefix("/").Handler(spa)
 
 	log.Fatal(http.ListenAndServe("localhost:8000", router))
