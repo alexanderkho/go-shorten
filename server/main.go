@@ -11,6 +11,7 @@ import (
 	"github.com/asaskevich/govalidator"
 	"github.com/dchest/uniuri"
 	"github.com/gorilla/mux"
+	"github.com/rs/cors"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -42,12 +43,11 @@ func postURLController(res http.ResponseWriter, req *http.Request) {
 	var data url
 	err := json.NewDecoder(req.Body).Decode(&data)
 	if err != nil {
-		res.WriteHeader(http.StatusBadRequest)
+		http.Error(res, "Invalid URL", http.StatusBadRequest)
 		return
 	}
 	if govalidator.IsURL(data.URL) == false {
-		res.WriteHeader(http.StatusBadRequest)
-		fmt.Fprint(res, "Invalid URL")
+		http.Error(res, "Invalid URL", http.StatusBadRequest)
 		return
 	}
 	uuid := uniuri.NewLen(5)
@@ -56,8 +56,7 @@ func postURLController(res http.ResponseWriter, req *http.Request) {
 	defer cancel()
 	_, err2 := urls.InsertOne(ctx, data)
 	if err2 != nil {
-		res.WriteHeader(http.StatusBadRequest)
-		fmt.Fprint(res, "DB Error")
+		http.Error(res, "Failed to shorten url", http.StatusBadRequest)
 		return
 	}
 	res.WriteHeader(http.StatusAccepted)
@@ -97,6 +96,7 @@ func main() {
 	router.HandleFunc("/{id}", redirectController).Methods("GET")
 	spa := spaHandler{staticPath: "../client/dist", indexPath: "index.html"}
 	router.PathPrefix("/").Handler(spa)
+	handler := cors.AllowAll().Handler(router)
 
-	log.Fatal(http.ListenAndServe("localhost:8000", router))
+	log.Fatal(http.ListenAndServe("localhost:8000", handler))
 }
